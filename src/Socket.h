@@ -25,6 +25,16 @@ public:
     /// @brief Calls `Disconnect`.
     ~Socket();
 
+    /// @brief Sets an option on the socket.
+    ///
+    /// Calls setsockopt with the correct params.
+    /// Will not set option 0x5801 as it is needed for insecure connections.
+    ///
+    /// @param name The option name.
+    /// @param value The option value.
+    /// @return 0 on success, 'SOCKET_ERROR' on error.
+    int SetOption(int name,  std::string value);
+
     /// @brief Connects the socket to the specified domain and port.
     ///
     /// The built-in encryption, which is different from TLS, is disabled. It means the

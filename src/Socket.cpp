@@ -106,6 +106,12 @@ void Socket::Disconnect()
         GlobalCleanup();
 }
 
+int Socket::SetOption(int name, std::string value)
+{
+    return setsockopt(m_Socket, SOL_SOCKET, name, value.c_str(), value.length());
+}
+
+
 int Socket::Send(const char *buffer, size_t size)
 {
     XASSERT(m_Connected == true);
