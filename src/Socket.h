@@ -31,9 +31,10 @@ public:
     /// Will not set option 0x5801 as it is needed for insecure connections.
     ///
     /// @param name The option name.
-    /// @param value The option value.
+    /// @param value The option value as a pointer e.g. (const char*)&val.
+    /// @param size The value structure size. e.g. sizeof(val).
     /// @return 0 on success, 'SOCKET_ERROR' on error.
-    int SetOption(int name,  std::string value);
+    int SetOption(int name, const char* value, int size);
 
     /// @brief Connects the socket to the specified domain and port.
     ///

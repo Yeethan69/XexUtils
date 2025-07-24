@@ -106,9 +106,9 @@ void Socket::Disconnect()
         GlobalCleanup();
 }
 
-int Socket::SetOption(int name, std::string value)
+int Socket::SetOption(int name, const char* value, int size)
 {
-    return setsockopt(m_Socket, SOL_SOCKET, name, value.c_str(), value.length());
+    return setsockopt(m_Socket, SOL_SOCKET, name, value, size);
 }
 
 
