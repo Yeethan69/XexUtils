@@ -11,18 +11,21 @@ bool Socket::s_Initialized = false;
 size_t Socket::s_ReferenceCounter = 0;
 
 Socket::Socket()
-    : m_Socket(INVALID_SOCKET), m_Port(0), m_Secure(false), m_Connected(false)
+    : m_Socket(INVALID_SOCKET), m_Context(nullptr), m_Port(0), m_Secure(false), m_Connected(false)
 {
+    TlsSession::InitContext(m_Context);
 }
 
 Socket::Socket(const std::string &domain, uint16_t port, bool secure)
-    : m_Socket(INVALID_SOCKET), m_Domain(domain), m_Port(port), m_Secure(secure), m_Connected(false)
+    : m_Socket(INVALID_SOCKET), m_Context(nullptr), m_Domain(domain), m_Port(port), m_Secure(secure), m_Connected(false)
 {
+    TlsSession::InitContext(m_Context);
 }
 
 Socket::Socket(const Socket &other)
-    : m_Socket(INVALID_SOCKET), m_Domain(other.m_Domain), m_Port(other.m_Port), m_Secure(other.m_Secure), m_Connected(false)
+    : m_Socket(INVALID_SOCKET), m_Context(nullptr), m_Domain(other.m_Domain), m_Port(other.m_Port), m_Secure(other.m_Secure), m_Connected(false)
 {
+    TlsSession::InitContext(m_Context);
 }
 
 Socket::~Socket()
@@ -78,7 +81,7 @@ HRESULT Socket::Connect()
 
     // Start TLS session if requested
     if (m_Secure)
-        TlsSession::Start(m_Socket, m_Domain);
+        TlsSession::Start(m_Context, m_Socket, m_Domain);
 
     m_Connected = true;
 
@@ -118,7 +121,7 @@ int Socket::Send(const char *buffer, size_t size)
 
     // Let the TLS session handle sending packets when in secure mode
     if (m_Secure)
-        return TlsSession::Send(buffer, size);
+        return TlsSession::Send(m_Context, buffer, size);
 
     return send(m_Socket, buffer, size, 0);
 }
@@ -129,7 +132,7 @@ int Socket::Receive(char *buffer, size_t maxSize)
 
     // Let the TLS session handle receiving packets when in secure mode
     if (m_Secure)
-        return TlsSession::Receive(buffer, maxSize);
+        return TlsSession::Receive(m_Context, buffer, maxSize);
 
     return recv(m_Socket, buffer, maxSize, 0);
 }
@@ -142,7 +145,7 @@ HRESULT Socket::AddECTrustAnchor(const uint8_t *dn, size_t dnSize, const uint8_t
         return E_FAIL;
     }
 
-    return TlsSession::AddECTrustAnchor(dn, dnSize, q, qSize, curveType);
+    return TlsSession::AddECTrustAnchor(m_Context, dn, dnSize, q, qSize, curveType);
 }
 
 HRESULT Socket::AddRsaTrustAnchor(const uint8_t *dn, size_t dnSize, const uint8_t *n, size_t nSize, const uint8_t *e, size_t eSize)
@@ -153,7 +156,7 @@ HRESULT Socket::AddRsaTrustAnchor(const uint8_t *dn, size_t dnSize, const uint8_
         return E_FAIL;
     }
 
-    return TlsSession::AddRsaTrustAnchor(dn, dnSize, n, nSize, e, eSize);
+    return TlsSession::AddRsaTrustAnchor(m_Context, dn, dnSize, n, nSize, e, eSize);
 }
 
 IN_ADDR Socket::DnsLookup()

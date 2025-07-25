@@ -102,6 +102,7 @@ public:
 
 private:
     SOCKET m_Socket;
+    TlsSession::TlsSessionContext* m_Context;
     std::string m_Domain;
     uint16_t m_Port;
     bool m_Secure;

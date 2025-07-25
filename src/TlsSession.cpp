@@ -12,14 +12,6 @@ namespace XexUtils
 namespace TlsSession
 {
 
-#define MAX_ANCHORS 100
-
-static br_ssl_client_context s_SslClientContext = {};
-static br_x509_minimal_context s_x509Context = {};
-static uint8_t s_IoBuffer[BR_SSL_BUFSIZE_BIDI] = {};
-static br_sslio_context s_IoContext = {};
-static br_x509_trust_anchor s_TrustAnchors[MAX_ANCHORS] = {};
-static size_t s_TrustAnchorCount = 0;
 static br_hmac_drbg_context s_drbg = {};
 
 static int SocketReadCallback(void *pContext, uint8_t *buffer, size_t maxSize)
@@ -36,70 +28,87 @@ static int SocketWriteCallback(void *pContext, const uint8_t *buffer, size_t max
     return send(socket, reinterpret_cast<const char *>(buffer), maxSize, 0);
 }
 
-HRESULT AddECTrustAnchor(const uint8_t *dn, size_t dnSize, const uint8_t *q, size_t qSize, EllipticCurveType curveType)
+bool InitContext(TlsSessionContext*& context)
+{
+    context = (TlsSessionContext*)malloc(sizeof(TlsSessionContext));
+    if(!context) {
+        return false;
+	}
+
+    memset(context, 0, sizeof(TlsSessionContext));
+    return true;
+}
+
+void FreeContext(TlsSessionContext*& context)
+{
+    memset(context, 0, sizeof(TlsSessionContext));
+    free(context);
+}
+
+HRESULT AddECTrustAnchor(TlsSessionContext* context, const uint8_t *dn, size_t dnSize, const uint8_t *q, size_t qSize, EllipticCurveType curveType)
 {
     XASSERT(dn != nullptr);
     XASSERT(q != nullptr);
 
-    if (s_TrustAnchorCount == MAX_ANCHORS)
+    if (context->TrustAnchorCount == MAX_ANCHORS)
     {
         DebugPrint("[XexUtils][TlsSession]: Error: Max amount of trust anchors reached.");
         return E_FAIL;
     }
 
-    s_TrustAnchors[s_TrustAnchorCount].dn.data = const_cast<uint8_t *>(dn);
-    s_TrustAnchors[s_TrustAnchorCount].dn.len = dnSize;
-    s_TrustAnchors[s_TrustAnchorCount].flags = BR_X509_TA_CA;
-    s_TrustAnchors[s_TrustAnchorCount].pkey.key_type = BR_KEYTYPE_EC;
-    s_TrustAnchors[s_TrustAnchorCount].pkey.key.ec.curve = curveType;
-    s_TrustAnchors[s_TrustAnchorCount].pkey.key.ec.q = const_cast<uint8_t *>(q);
-    s_TrustAnchors[s_TrustAnchorCount].pkey.key.ec.qlen = qSize;
+    context->TrustAnchors[context->TrustAnchorCount].dn.data = const_cast<uint8_t *>(dn);
+    context->TrustAnchors[context->TrustAnchorCount].dn.len = dnSize;
+    context->TrustAnchors[context->TrustAnchorCount].flags = BR_X509_TA_CA;
+    context->TrustAnchors[context->TrustAnchorCount].pkey.key_type = BR_KEYTYPE_EC;
+    context->TrustAnchors[context->TrustAnchorCount].pkey.key.ec.curve = curveType;
+    context->TrustAnchors[context->TrustAnchorCount].pkey.key.ec.q = const_cast<uint8_t *>(q);
+    context->TrustAnchors[context->TrustAnchorCount].pkey.key.ec.qlen = qSize;
 
-    s_TrustAnchorCount++;
+    context->TrustAnchorCount++;
 
     return S_OK;
 }
 
-HRESULT AddRsaTrustAnchor(const uint8_t *dn, size_t dnSize, const uint8_t *n, size_t nSize, const uint8_t *e, size_t eSize)
+HRESULT AddRsaTrustAnchor(TlsSessionContext* context, const uint8_t *dn, size_t dnSize, const uint8_t *n, size_t nSize, const uint8_t *e, size_t eSize)
 {
     XASSERT(dn != nullptr);
     XASSERT(n != nullptr);
     XASSERT(e != nullptr);
 
-    if (s_TrustAnchorCount == MAX_ANCHORS)
+    if (context->TrustAnchorCount == MAX_ANCHORS)
     {
         DebugPrint("[XexUtils][TlsSession]: Error: Max amount of trust anchors reached.");
         return E_FAIL;
     }
 
-    s_TrustAnchors[s_TrustAnchorCount].dn.data = const_cast<uint8_t *>(dn);
-    s_TrustAnchors[s_TrustAnchorCount].dn.len = dnSize;
-    s_TrustAnchors[s_TrustAnchorCount].flags = BR_X509_TA_CA;
-    s_TrustAnchors[s_TrustAnchorCount].pkey.key_type = BR_KEYTYPE_RSA;
-    s_TrustAnchors[s_TrustAnchorCount].pkey.key.rsa.n = const_cast<uint8_t *>(n);
-    s_TrustAnchors[s_TrustAnchorCount].pkey.key.rsa.nlen = nSize;
-    s_TrustAnchors[s_TrustAnchorCount].pkey.key.rsa.e = const_cast<uint8_t *>(e);
-    s_TrustAnchors[s_TrustAnchorCount].pkey.key.rsa.elen = eSize;
+    context->TrustAnchors[context->TrustAnchorCount].dn.data = const_cast<uint8_t *>(dn);
+    context->TrustAnchors[context->TrustAnchorCount].dn.len = dnSize;
+    context->TrustAnchors[context->TrustAnchorCount].flags = BR_X509_TA_CA;
+    context->TrustAnchors[context->TrustAnchorCount].pkey.key_type = BR_KEYTYPE_RSA;
+    context->TrustAnchors[context->TrustAnchorCount].pkey.key.rsa.n = const_cast<uint8_t *>(n);
+    context->TrustAnchors[context->TrustAnchorCount].pkey.key.rsa.nlen = nSize;
+    context->TrustAnchors[context->TrustAnchorCount].pkey.key.rsa.e = const_cast<uint8_t *>(e);
+    context->TrustAnchors[context->TrustAnchorCount].pkey.key.rsa.elen = eSize;
 
-    s_TrustAnchorCount++;
+    context->TrustAnchorCount++;
 
     return S_OK;
 }
 
-void Start(const SOCKET &sock, const std::string &domain)
+void Start(TlsSessionContext* context, const SOCKET &sock, const std::string &domain)
 {
     XASSERT(sock != INVALID_SOCKET);
     XASSERT(domain.empty() == false);
 
-    br_ssl_client_init_full(&s_SslClientContext, &s_x509Context, s_TrustAnchors, s_TrustAnchorCount);
+    br_ssl_client_init_full(&context->SslClientContext, &context->x509Context, context->TrustAnchors, context->TrustAnchorCount);
 
-    br_ssl_engine_set_buffer(&s_SslClientContext.eng, s_IoBuffer, sizeof(s_IoBuffer), 1);
+    br_ssl_engine_set_buffer(&context->SslClientContext.eng, context->IoBuffer, sizeof(context->IoBuffer), 1);
 
-    br_ssl_client_reset(&s_SslClientContext, domain.c_str(), 0);
+    br_ssl_client_reset(&context->SslClientContext, domain.c_str(), 0);
 
     br_sslio_init(
-        &s_IoContext,
-        &s_SslClientContext.eng,
+        &context->IoContext,
+        &context->SslClientContext.eng,
         SocketReadCallback,
         const_cast<SOCKET *>(&sock),
         SocketWriteCallback,
@@ -107,24 +116,24 @@ void Start(const SOCKET &sock, const std::string &domain)
     );
 }
 
-int Send(const char *buffer, size_t size)
+int Send(TlsSessionContext* context, const char *buffer, size_t size)
 {
     XASSERT(buffer != nullptr);
 
-    if (br_sslio_write_all(&s_IoContext, buffer, size) != 0)
+    if (br_sslio_write_all(&context->IoContext, buffer, size) != 0)
     {
         DebugPrint(
             "[XexUtils][TlsSession]: Error: SSL write error: %d",
-            br_ssl_engine_last_error(&s_SslClientContext.eng)
+            br_ssl_engine_last_error(&context->SslClientContext.eng)
         );
         return SOCKET_ERROR;
     }
 
-    if (br_sslio_flush(&s_IoContext) != 0)
+    if (br_sslio_flush(&context->IoContext) != 0)
     {
         DebugPrint(
             "[XexUtils][TlsSession]: Error: SSL flush error: %d",
-            br_ssl_engine_last_error(&s_SslClientContext.eng)
+            br_ssl_engine_last_error(&context->SslClientContext.eng)
         );
         return SOCKET_ERROR;
     }
@@ -132,14 +141,14 @@ int Send(const char *buffer, size_t size)
     return size;
 }
 
-int Receive(char *buffer, size_t maxSize)
+int Receive(TlsSessionContext* context, char *buffer, size_t maxSize)
 {
     XASSERT(buffer != nullptr);
 
-    int bytesRead = br_sslio_read(&s_IoContext, buffer, maxSize);
+    int bytesRead = br_sslio_read(&context->IoContext, buffer, maxSize);
 
 #ifndef NDEBUG
-    int lastSslError = br_ssl_engine_last_error(&s_SslClientContext.eng);
+    int lastSslError = br_ssl_engine_last_error(&context->SslClientContext.eng);
     if (bytesRead < 0 && lastSslError != 0)
         DebugPrint("[XexUtils][Socket]: Error: SSL read error: %d", lastSslError);
 #endif
